@@ -1,0 +1,298 @@
+html,
+body {
+background-color: #000000;
+   padding: 0;
+   margin:0;
+   font-family: Microsoft Yahei, Arial;
+}
+@font-face {
+   font-family: Helvetica_Light;
+   src: url(HelveticaNeueLTPro-UltLt.woff);
+}
+
+img{ padding:0;
+    margin: 0;}
+
+.dygraph-legend {
+    background: #000000;
+}
+.dygraph-axis-label{
+	margin: 0 30px 0 0 ;
+}
+.stockGraphs{
+	display: inline-block;
+	
+}
+
+/********** Realtime monitor page **********/
+
+.stockHolder{
+    display: inline-block;
+    padding: 20px;
+    background-color: #26282f;
+    opacity: 0.65;
+    margin: 0 0 90px 120px;
+    z-index: 1;
+}
+
+#rtmHeader{
+    background-image: url('../img/rtmheader.png');
+    background-repeat: no-repeat;
+    width: 415px;
+    height: 93px;
+    margin: 30px 0 0 37pt;
+}
+
+#realtimeMonitor {
+    width: 100px;
+    height: 100px;
+    float: left;
+    border: none;
+    margin:0;
+    padding: 40px 0 0 45px;
+    padding-left: 30px;
+    padding-top: 40px;
+    background-color: rgb(0,0,0);
+    background-image: url('../img/skymonitor.jpg');
+    background-size: cover;
+   
+ }
+
+#realtimeMonitorData {
+   margin: 60px 0 0 0 ;
+ }
+
+ .skyFooter{
+    height: 80px;
+    width: 100%;
+    font-family: Helvetica_Light;
+ }
+
+.skyFooter #ft_Time{
+    float:left;
+    margin: 30px 0 0 130px;
+    font-size: 16pt;
+    color: #fbd4d0;
+    letter-spacing: 2pt;
+}
+
+.skyFooter #ft_cnTime{
+    float:left;
+    margin: 30px 0 0 340px;
+    font-size: 16pt;
+    color: #fbd4d0;
+    letter-spacing: 2pt;
+}
+
+.stockHolderfonts{
+    font-size: 14px;
+    color: #fff3c9;
+    line-height: 15px;
+    padding: 0 0 10px 10px;
+    height: 12px;
+    margin: 0 0 -10px 0;
+}
+
+.graphTitle_0{
+    color: rgb(51,204,204);
+}
+
+.graphTitle_1{
+    color:rgb(220,100,100);   
+}
+
+.loading{
+    background-image: url('../img/loading.gif');
+    background-repeat: no-repeat;
+    width: 490px;
+    height: 320px;
+    margin: -270px 0 0 -20px;
+    background-size: 100%;
+    background-position: 0px -50px;
+    opacity: .6;
+    position: absolute;
+    z-index: 10;
+}
+div.dygraph-legend{ background-color: #000; }
+
+.chartmsg{
+    position: absolute;
+    color: rgb(252,239,151);
+    z-index: 30;
+    width: 250px;
+    margin: -15px 0 0 175px ;
+    height: 50px;
+    display: none;
+    background-color:rgb(75,75,75);
+    padding: 10px;
+    border-radius: 6px;
+}
+
+#master {
+    width: 1000px;
+    border: none;
+    overflow: hidden; /* add this to contain floated children */
+}
+
+#skylineLab {
+    width: 100px;
+    height: 100px;
+    float: left;
+    background-image: url('../img/skyback.jpg');
+    background-size: cover;
+    border: none;
+    margin:0;
+    padding: 15px;
+    padding-top: 40px;
+    background-color: rgb(0,0,0);
+}
+
+#mainBody {
+    width: 100px;
+    height: 100px;
+    float: left;
+    border: none;
+    margin:0;
+    padding: 15px;
+    padding-top: 40px;
+    background-color: rgb(0,0,0);
+}
+
+
+
+#logoLeft{
+    background-image: url('../img/skylab.png');
+    width: 451px;
+    height: 91px;
+    background-repeat: no-repeat;
+    float: left;
+    position: absolute;
+    margin: 10px 0 0 55px;
+}
+
+#logoRight{
+    background-image: url('../img/skylogo.png');
+    width: 151px;
+    height: 425px;
+    float: right;
+    margin: 20px 55px 0 0 ;
+}
+
+#mainGraphHolder{
+    width: 1500px;
+    height: 720px;
+    position: absolute;
+    background-color: rgb(123,23,2);
+    margin: 0 auto 0 auto;
+}
+
+#mainGraph{
+    width: 1500px;
+    height: 500px;
+    float: left;
+    background-color: rgb(150,23,100);
+}
+
+#info{
+    width:1500px;
+    height: 220px;
+    float: left;
+    background-color: rgb(20,100,10);
+}
+
+#infoSub1{
+    width: 750px;
+    height: 220px;
+    float: left;
+    background-color: rgb(100,100,10);
+}
+
+#infoSub2{
+    width: 750px;
+    height: 220px;
+    float: left;
+    background-color: rgb(200,100,10);
+}
+
+
+.chart-legend li span{
+    display: none;
+}
+
+.chartDetails{
+    font-size: 12px;
+
+    width: 450px;
+    height: 120px;
+    padding: 0;
+    margin:15px 0;
+}
+.chartInfo{
+    float: left;
+    width: 150px;
+    height: 100px;
+    margin: 0;
+    padding:0;
+    color:#96bfcd;
+    line-height: 20px;
+}
+.chartDonnut{
+    
+    float: left;
+    width: 250px;
+    height: 100px;
+    margin: 0;
+    padding: 0;
+}
+.chartDonnut .chartDonnutLabel{
+     font-family: Helvetica_Light;
+    letter-spacing: 1px;
+    position: absolute;
+    font-size: 22px;
+    color:#ffabad;
+    margin: 39px 0 0 53px;
+}
+.chartSymbol{
+    padding: 7px 0px 0px 0px;
+    margin: 0 0 0 -5px;
+}
+.chartDonnutTitle{
+    color: #7ea4b1;
+    font-size: 12px;
+    margin: 0 0 18px 0;
+    padding: 0;
+    line-height: 20px;
+}
+
+.chartlegend{
+    font-size: 12px;
+    color: #fff;
+    position: absolute;
+    z-index: 1;
+    width: 206px;
+    background-repeat: no-repeat;
+    height: 91px;
+    padding: 10px;
+    line-height: 18px;
+    margin: -71px 0 0 0px;
+    background-image: url('../img/bubble.png');
+}
+
+.chartPriceClass{
+    margin: 0 0 10px 0;
+}
+.legend_label_color_0{
+    color:rgb(51,204,204);
+}
+
+.legend_label_color_1{
+    color:rgb(220,100,100);
+}
+
+.legend_label_color_2{
+    color:rgb(220,255,69);
+}
+
+.legend_label_color_3{
+    color:rgb(255,61,132);
+}

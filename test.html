@@ -1,0 +1,52 @@
+<html>
+	
+	<head>
+	</head>
+	<script type="text/javascript">
+class Polygon {
+
+  constructor(height, width) {
+    this.height = height;
+    this.width = width;
+    this.cal = 10;
+    this.w = 10;
+  }
+	
+	hello(){
+  	//console.log("hello");
+  	//console.log(this.w);
+   }
+
+    test(){
+    	this.w ++;
+    	var t = 10;
+    	//console.log(t);
+    }
+}
+
+  String.prototype.insert = function(add,search){
+        var pos = a.indexOf(search);
+        pos =  (pos != -1) ? pos : this.length;
+        return [this.slice(0, pos), add, this.slice(pos)].join('');
+
+  }
+
+  String.prototype.insertAfter = function(add, search){
+        var pos = a.indexOf(search) + search.length;
+        pos =  (pos != -1) ? pos : this.length;
+        return [this.slice(0, pos), add, this.slice(pos)].join('');  
+  }
+
+  var a = "i want apple";
+  console.log(a.insert("an ","apple"));
+  console.log(a.insertAfter(",an","want"));
+var p = new Polygon(125,23); // ReferenceError
+p.test();
+p.hello();
+p.test();
+p.hello();
+	</script>
+	<body>
+	</body>
+
+</html>

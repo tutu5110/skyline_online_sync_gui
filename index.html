@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html>
+<!-- main goals 
+    
+    Define: 
+
+    Major types  = US stock, Chinese Stock, Chinese Futures, Chinese ETF market, Chinese Commodities, Us Commodities.
+    
+    Side types   = China Bond market, US bond market.
+
+    World Market   = Major economic body stock market.
+
+
+    Methods & Functions
+    Exploding Volume:
+    Checks Volume up to 30,60,120,180,360 records before.
+    Check for price movement
+    Check for relatively High / Low Points with settings of 30,60,120,180,360 records before
+
+    
+    Level of Alarms:
+    Level I, Top level, refresh interval = 1 min. Method used: Exploding Volume.
+
+    Goals:
+    1. realtime monitor Major types, Side types, and other types
+    2. Highlight purchasable groups
+    3. Estimate time and APR
+    2. custom alert level I for Major types.
+    3. alert Level II for World Market, Side Types.
+    4. Dynamically add / remove stock pairs 
+    5. Backend Setting System
+    6. Suggestion System: suggesting 
+
+    Todos:
+    1. 量价异动
+    2. get expected return 
+    3. get previous high point, and compare possible profit
+    4. set begin and end date for Chinese Fund
+    5. // i removed 'cn in skydataloader.js line 197'
+    6. I also removed cn_fund_ from line 145 before returnning code
+  
+-->
+
+<head>
+    <title></title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="css/style.css"/>
+    <script src="js/jquery-1.11.3.min.js"></script>
+    <script src="js/dygraph-combined.js"></script>
+    <script src="js/super-annotations.js"></script>
+    <script src="js/SKYDataLoader.js"></script>
+    <script src="js/Math.js"></script>
+    <script src="js/Chart.min.js"></script>
+    <script src="js/PrototypeFunctions.js"></script>
+    <script src="js/convert.js"></script>
+    <script src="settings.js"></script>
+    <script src="js/simple_statistics.min.js"></script>
+    <script src="js/regression.js"></script>
+</head>
+    <body>
+        <div id="master">
+               <div id="skylineLab">
+                   <div id="logoLeft"></div>
+                   <div id="logoRight"></div>
+                   <div id="mainGraphHolder">
+                        <div id="mainGraph">123</div>
+                        <div id="info">
+                            <div id="infoSub1">1</div>
+                            <div id="infoSub2">2</div>
+                        </div>
+                   </div>
+               </div>
+               <div id="mainBody"></div>
+               <div id="realtimeMonitor">
+                   <div id="rtmHeader"></div>
+                   <div id="realtimeMonitorData"></div>
+                   <div class="skyFooter"></div>
+               </div>
+               
+         </div>
+       
+
+<script type="text/javascript">
+
+var g;
+
+// max page is max_pages +1; so 3 pages is 2 here
+var MAX_PAGES = 2;
+
+var isDebug = true;
+
+var loadedResults = new Array();
+
+var loadedFlattenHistoryResults = new Array();
+
+var loadedFlattenHistoryPriceResults = new Array();
+
+var loadedDataStatistics = new Array();
+
+var hedgeResults = new Array();
+
+var SHOW_SIMILAR_TYPE_AVERAGE = false;
+
+var NUM_OF_GRAPHS = 0;
+
+var CN_REALTIME_SERVER = 'http://qt.gtimg.cn/q=s_';
+var FUND_SERVER = 'http://fund.eastmoney.com/api/PingZhongApi.ashx?m=0&fundcode=';
+//163412&indexcode=000300&type=hy';
+var FUND_SERVER_COMPLETE = 'http://fund.eastmoney.com/pingzhongdata/163412.js?v=20160406113818';
+var FUND_SERVER_TENCENT = 'http://stockjs.finance.qq.com/fundUnitNavAll/data/year_all/#fundcode#.js';
+
+var CNSTOCK_HISTORY_SERVER = 'http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_dayqfq2013&param=#SYMBOL#,day,#begin#,#end#,640,qfq';
+
+var INDEXFUTURE_SERVER = 'http://stock2.finance.sina.com.cn/futures/api/json.php/CffexFuturesService.getCffexFuturesDailyKLine?symbol=IF1605';
+
+var USSTOCK_REALTIME_SERVER = 'http://finance.yahoo.com/webservice/v1/symbols/#SYMBOL#/quote?format=json&view=detail';
+ 
+var USSTOCK_HISTORY_SERVER = 'https://finance-yql.media.yahoo.com/v7/finance/chart/#SYMBOL#?period2=#end#&period1=#begin#&interval=1d&indicators=quote&includeTimestamps=true';
+
+var USSTOCK_MAX_HISTORY_SERVER = 'https://finance-yql.media.yahoo.com/v7/finance/chart/CHAD?range=max&interval=1mo&indicators=quote&includeTimestamps=true';
+
+var CN_COMMODITY_FUTURE_REALTIME_SERVER = 'http://hq.sinajs.cn/?list=';
+
+var SKYLINE_CACHE_SERVER = 'StockServer.php?sym=#SYMBOL#&param=day,#begin#,#end#';
+
+// this set to true will use accelerated cache service for global stocks
+
+ var graphData = Array();
+
+var USE_SKYLINE_CACHE_SERVICE = true;
+
+var FUND_TIME_MAPPING = {
+ "m":"m", 
+"3m":"q", 
+"6m":"hy",
+"12m":"y",
+"y":"y",
+"3y":"try",
+"5y":"fiy",
+"ytd":"sy",
+"max":"se"};
+
+var is
+
+var Files = new Array();
+
+//Files[1]['filename'] = "SZ159919";
+var FileLength = Files.length;
+
+var graphs = {};
+
+var total_graphs = 0;
+
+var originalWindowWidth = 0;
+
+var FingerStartx = 0
+
+var FingerDist = 0
+
+// add window listeners 
+window.addEventListener('load', function(){
+
+    var body = $("html, body");
+    var master = document.getElementById('master');
+    var w = originalWindowWidth;
+    var currentPageIndex = 0;
+    master.addEventListener('touchstart', function(e){
+        var touchobj = e.changedTouches[0] // reference first touch point (ie: first finger)
+        FingerStartx = parseInt(touchobj.clientX) // get x position of touch point relative to left edge of browser
+        e.preventDefault()
+    }, false)
+    /*
+    master.addEventListener('touchmove', function(e){
+        var touchobj = e.changedTouches[0] // reference first touch point for this event
+        var dist = (parseInt(touchobj.clientX) - FingerStartx)*-1;
+        body.scrollLeft(dist);
+        body.setsco
+        e.preventDefault();
+
+    }, false)
+        */
+    master.addEventListener('touchend', function(e){
+        var touchobj = e.changedTouches[0];
+        FingerDist = parseInt(touchobj.clientX) - FingerStartx;
+       // console.log('Status: final distance!" '+FingerDist+'px');
+        e.preventDefault();
+
+        if(FingerDist < -30){
+            //-15 is the padding of DIV, change this number if div is changed
+             currentPageIndex++;
+             if(currentPageIndex > MAX_PAGES)
+                currentPageIndex = MAX_PAGES;
+             console.log(currentPageIndex);
+             body.stop().animate({scrollLeft:(currentPageIndex * w+30)}, '500', 'swing', function() { 
+                
+             });
+        } else if(FingerDist>30){
+            currentPageIndex--;
+            if(currentPageIndex<0)
+                currentPageIndex = 0;
+            body.stop().animate({scrollLeft:currentPageIndex * w+30}, '500', 'swing', function() { 
+       
+            });
+        }
+         }, false)
+}, false)
+    
+// Main body functions
+$(document).ready(function(){
+    
+   var w = $(document).width();
+   var h = $(document).height();
+   // update window width
+   originalWindowWidth = w;
+   // set skyline width
+   var rtmheight = Math.ceil(list.length /3) * 452 + 500;
+   $('#master').width(3*w+90).height(rtmheight);
+   $('#skylineLab').width(w).height(h);
+   $('#mainBody').width(w).height(h);
+   
+   $('#realtimeMonitor').width(w).height(rtmheight);
+
+   console.log($(document).width());
+
+   $('#mainGraphHolder').css('margin','430px 0 0 '+(originalWindowWidth/2-750)+'px');
+
+   //update footer
+   var footer = $('.skyFooter');
+   var cd = getFullYMDH();
+   var cncd = getCNFullYMDH();
+   footer.html("<div id='ft_Time'>Current: "+cd+"</div>"+"<div id='ft_cnTime'>China: "+cncd+"</div>")
+   //var s = new SKYDataLoader(["sz002007", "us_CHAD"],"y",0);
+   //var s = new SKYDataLoader(["jj161725", "us_CHAD"],"y",0);
+   //var s = new SKYDataLoader(["F_IF", "F_IH"],"y",0);
+   // var s = new SKYDataLoader(["us_tecs", "us_orcl"],
+   //  {"duration":"y",
+   //  "div":"mainBody",
+   //  "updateRealtime":false},0);
+   //loadRealtimeStockPairs();
+    
+    // initialize realtime area
+   for(var i = 0 ; i < list.length; i ++){
+        var stockNames = list[i];
+        stockNames = formatStockNames(stockNames);
+        var s = new SKYDataLoader([stockNames[0],stockNames[1]],
+        {"duration":"2y",
+        "div":"realtimeMonitorData",
+        "updateRealtime":true},i); 
+        graphData[i] = s;
+        graphData[i].createGraph();    
+    }
+
+    /*var target = 'chad';
+    var compareList = formatStockNames(loadlist());
+    var GComparingList = new Array();
+    for(var i = 0 ; i < compareList.length; i ++){
+        var s = new SKYDataLoader([compareList[i],target],
+        {"duration":"2y",
+        "div":"realtimeMonitorData",
+        "automateHedge": true,
+        "drawGraph": false,
+        "updateRealtime":false},0); 
+    }*/
+  // var t2 = new SKYDataLoader(["us_chad", "sz000100"],"y",3);
+    //XLE
+   //var t = new SKYDataLoader(["sz510300", "us_t"],"6m");
+   //continue here
+   // fix chad, possibly starting date is not same
+  // s.createGraph();
+
+   // t2.createGraph();
+  // createGraph(["sz510300", "us_CHAD"],"6m");
+  // console.log(getDayInChina().toTimeStamp());
+    
+   //console.log(getDayOneYearAgo());
+ });
+function loadList(){
+    return ['159919','601328','000100','chad'];
+}
+function loadRealtimeStockPairs(){
+ $.get("settings.tu", function(data){
+    var list = data.split("\n");
+    for(var i = 0 ; i < list.length; i ++){
+        var stockNames = list[i].split(',');
+        stockNames = formatStockNames(stockNames);
+        var s = new SKYDataLoader([stockNames[0],stockNames[1]],
+        {"duration":"2y",
+        "div":"realtimeMonitorData",
+        "updateRealtime":true},i); 
+        graphData[i] = s;
+        graphData[i].createGraph();    
+    }
+ });
+}
+
+function formatStockNames(nameArr){
+    for(var i =0 ; i < nameArr.length; i ++)
+        if(nameArr[i].toLowerCase().beginWith('0') ||
+           nameArr[i].toLowerCase().beginWith('3') ||
+           nameArr[i].toLowerCase().beginWith('1'))
+           nameArr[i] =  'sz'+nameArr[i];
+        else if(nameArr[i].toLowerCase().beginWith('6'))
+            nameArr[i] = 'sh'+ nameArr[i];
+        else if(nameArr[i].toLowerCase().contains('if')||
+            nameArr[i].toLowerCase().contains('ih') ||
+            nameArr[i].toLowerCase().contains('ic'))
+            nameArr[i] = nameArr[i];
+        else if(!isFinite(nameArr[i]))
+            nameArr[i] = 'us_'+nameArr[i];
+        else 
+            nameArr[i] = nameArr[i];
+    return nameArr;
+}
+        
+        // main functions   
+function parseFutureRealtime(data) {
+    var temp = data.split(",");
+    var result = {};
+    if (temp) {
+        // index futures
+        if (data.contains("CFF_RE")) {
+            result['price'] = temp[3];
+        } else {
+            // commodity futures
+            result['price'] = temp[6];
+        }
+    }
+    return result;
+}
+
+function parseTencentRealtime(data) {
+    var temp = data.split("~");
+    if (temp) {
+        var result = {};
+        result['price'] = temp[3];
+        result['priceIncrement'] = temp[4];
+        result['percent'] = temp[5];
+        return result;
+    }
+    return data;
+}
+
+function inigraph(data, divName, GRAPH_ID) {
+   
+    var tempGraph = new Dygraph(
+        document.getElementById(divName),
+        data, {
+            fractions: false,
+            errorBars: false,
+            width: 450,
+            height:225,
+            showRoller: false,
+            legend: 'follow',
+            labelsDiv: 'g_legend_'+GRAPH_ID,
+            labelsDivStyles: {
+                'background': 'none',
+                'color': '#fff'
+            },
+            colors: ["rgb(51,204,204)",
+                "rgb(220,100,100)",
+                "rgb(200,255,69)",
+                "rgb(255,61,132)"
+            ],
+            strokePattern: [1, 15],
+            strokeWidth: 1,
+            drawPoints: true,
+            pointSize: 1.5,
+            highlightCircleSize: 5,
+             axes : { 
+                x : { drawAxis:false,
+                      drawGrid:false },
+                y : {axisLineWidth : 0.01,
+                     axisLabelColor:  "rgb(135,142,167)"}
+            },
+            
+            'Hedge': {
+                strokePattern: null,
+                strokeWidth: 2,
+                fillGraph: true,
+                drawPoints: false,
+            },
+            'MHedge': {
+                strokePattern: null,
+                strokeWidth: 2,
+                fillGraph: true,
+                drawPoints: false
+            },
+             highlightCallback: function(e, x, pts, row) {
+                  // console.log("row is " + row+ "  "+loadedFlattenHistoryPriceResults[GRAPH_ID][row]);
+                  var type = loadedDataStatistics[GRAPH_ID]['hedgeType'];
+                  var skip = 0;
+                  if(type == 1)
+                    skip = 3;
+                  else if(type == 2)
+                    skip = 2;
+                  var str = '';
+                  var addition = "";
+                  for(var i =0 ; i < loadedFlattenHistoryPriceResults[GRAPH_ID][row].length; i ++){
+                      if( i != skip){
+                      str +='<span class="legend_label_color_'+i+'">'+loadedFlattenHistoryPriceResults[GRAPH_ID][row][i].toFixed(2)+'</span>&nbsp;&nbsp;&nbsp;';
+                        }
+                    }
+                 $('#chartPrice_'+GRAPH_ID).html(str);
+              },
+
+            rollPeriod: 7
+        }
+    );
+    graphs[GRAPH_ID] = tempGraph;
+    $('#' + divName).append("<div class='loading' id='loader_" + GRAPH_ID + "'></div>");
+
+        
+        var data = [
+           {
+            value: 89,
+            color: "#cc6262",
+            label: "Success"
+        }, {
+            value: 11,
+            color: "#6acae8",
+        }];
+
+        var options = {
+            segmentShowStroke: false,
+            animateRotate: true,
+            animateScale: false,
+            percentageInnerCutout:80,
+            tooltipTemplate: "<%= value %>%"
+        }
+
+        var ctx = document.getElementById("chartDonutSuccess_"+GRAPH_ID).getContext("2d");
+
+        var myChart = new Chart(ctx).Doughnut(data, options);
+
+        $('#chartDonutSuccess_'+GRAPH_ID).width(200).height(100).css('margin','0 0 0 -30px');
+   // get
+    //add loadings
+}
+
+
+
+function formatDate(value) {
+    if (value) {
+        Number.prototype.padLeft = function(base, chr) {
+            var len = (String(base || 10).length - String(this).length) + 1;
+            return len > 0 ? new Array(len).join(chr || '0') + this : this;
+        }
+        var d = new Date(value),
+            dformat = [(d.getMonth() + 1).padLeft(),
+                d.getDate().padLeft(),
+                d.getFullYear()
+            ].join('/') +
+            ' ' + [d.getHours().padLeft(),
+                d.getMinutes().padLeft(),
+                d.getSeconds().padLeft()
+            ].join(':');
+        return dformat;
+    }
+}
+
+
+function formatData(data) {
+    //from json
+
+    //from file
+    var result = data.contains("{") && data.contains(":");
+    // RESULT IS JSON DATA// in this case YUI JSON DATA
+    if (result) {
+        var result = new Object();
+        var array = JSON.parse(data);
+        var indicatorArr = array.chart.result[0].indicators.quote[0];
+        var timeStamps = array.chart.result[0].timestamp;
+        var str = "";
+        result['close'] = indicatorArr.close;
+        result['volume'] = indicatorArr.volume;
+        result['timestamps'] = timeStamps;
+        return result;
+    } else {
+        //if csv
+        return data;
+    }
+}
+
+function calMinusHedge(cval, nval) {
+    if (cval == 0)
+        return nval;
+    else
+        cval = cval - nval;
+    return cval;
+}
+
+function getTime(timestamp) {
+    var date = new Date(timestamp * 1000);
+    var mon = date.getMonth() + 1;
+    var day = date.getDate();
+    var year = date.getFullYear();
+    return mon + "/" + day + "/" + year;
+}
+
+// g.updateOptions({
+//         'file': animate("V1")
+//   });
+
+//continue here , put saveresults id into the "t" array(skydataloader obj)
+
+function saveResults(GRAPH_ID, results, param) {
+
+    //parsing parameters
+
+    if (loadedResults[GRAPH_ID] == null)
+        loadedResults[GRAPH_ID] = {}
+      //install system vars
+    if (loadedResults[GRAPH_ID]['system'] == undefined)
+        loadedResults[GRAPH_ID]['system'] = new Array();
+  
+    loadedResults[GRAPH_ID]['system'].push(param);
+    loadedResults[GRAPH_ID][param['code']] = results;
+    //console.log(type+" total is " + params['totalItems'] + " current is " + objLength(loadedResults[id]));
+    if (objLength(loadedResults[GRAPH_ID]) == (param['totalItems'] + 1)) {
+        //console.log("lunching graphs");
+        var systemVars = getSytemVariables(loadedResults[GRAPH_ID]);
+        lunchGraphs(preflight(loadedResults[GRAPH_ID], GRAPH_ID), systemVars, GRAPH_ID);
+        if(graphData[GRAPH_ID].updateRealtime)
+            updateRealtime(graphData[GRAPH_ID]);
+    }
+}
+
+function updateRealtime(obj) {
+    var codes = obj._code;
+    var len = codes.length;
+    for (var i = 0; i < len; i++) {
+        fetchRealtime(codes[i], obj.purchasePrice[codes[i]], obj.graphID);
+    }
+}
+
+function fetchRealtime(code, purchasePrice, resourceID) {
+
+    //ck type
+    if (code.contains('us')) {
+        var server = "engine.php?cadd=" + encodeURIComponent(USSTOCK_REALTIME_SERVER.replace("#SYMBOL#", code.substring(3, code.length)));
+
+    } else if (code.toLowerCase().contains('f_')) {
+
+        var server = "FutureServer.php?sym=" + code.substring(2, code.length) + "&type=realtime";
+        // continue here!!!e
+
+    } else {
+        //chinese stock, chinese fund
+        var server = "engine.php?cadd=" + encodeURIComponent(CN_REALTIME_SERVER + code);
+    }
+
+    // begin AJAX
+    $.get(server, function(data) {
+        if (code.contains('us'))
+        // parse US STOCK realtime
+            var result = JSON.parse(data).list.resources[0].resource.fields;
+        else if (code.toLowerCase().contains('f_'))
+        // parse CN FUTURE realtime
+            var result = parseFutureRealtime(data);
+        else
+        // parse CN STOCK realtime
+            var result = parseTencentRealtime(data);
+
+
+        updateToGraph(result['price'], code, purchasePrice, resourceID);
+        
+        // end AJAX
+    });
+}
+
+function updateToGraph(currentPrice, code, purchasePrice, resourceID) {
+    // get latest percent
+    var per = ((parseFloat(currentPrice) - parseFloat(purchasePrice)) / parseFloat(purchasePrice) * 100).toFixed(2);
+    
+    graphData[resourceID].realtimeDataCache['currentPrice'][code] = parseFloat(currentPrice);
+
+    graphData[resourceID].realtimeDataCache['data'][code] = per;
+
+    graphData[resourceID].realtimeDataCache['counter']++;
+
+    //check if ready
+    if (graphData[resourceID].realtimeDataCache['counter'] == graphData[resourceID].realtimeDataCache['total']) {
+        //ready, update and lunch
+        var str = getDHMInChina() + ',';
+        var h = 0;
+        var mh = 0;
+
+        var len = graphData[resourceID]._code.length;
+        //sanitation
+        if (len != graphData[resourceID].realtimeDataCache['total']) {
+            console.log("update realtime failed for " + code + " since the resource length and datacache length is not same!!!");
+            return false;
+        }
+        //console.log(graphData[resourceID].realtimeDataCache['data']);
+        //console.log(graphData[resourceID]._code);
+        var tmpPriceCache = Array();
+        for (var i = 0; i < len; i++) {
+            var v = graphData[resourceID].realtimeDataCache['data'][graphData[resourceID]._code[i]];
+            tmpPriceCache[i] = graphData[resourceID].realtimeDataCache['currentPrice'][graphData[resourceID]._code[i]];
+            str += v + ",";
+            h += parseFloat(v);
+            if (mh == 0)
+                mh = parseFloat(v);
+            else
+                mh = mh - parseFloat(v);
+        }
+        //assemble
+        str += h + "," + mh;
+        str = '\n' + str;
+        tmpPriceCache.push(h);
+        tmpPriceCache.push(mh);
+        //update
+        loadedFlattenHistoryResults[resourceID] += str;
+        loadedFlattenHistoryPriceResults[resourceID].push(tmpPriceCache);
+        updateGraphRealtime(loadedFlattenHistoryResults[resourceID], resourceID);
+    }
+}
+
+function getStockType(type) {
+    if (type.contains("us")) {
+        return "us";
+    } else {
+        if(type.isCNMarket())
+            return "cn_stock";
+        else if(type.isFuture())
+            return "cn_future";
+
+    }
+}
+
+function lunchGraphs(str, systemVars, GRAPH_ID) {
+    // get statistics
+    var statVars = str.pop();
+    // get system related statvars
+    var hedgeType = statVars['hedgeType'];
+    // get statistics string
+    var stat = statVars['stat'];
+    // backup globally
+    loadedDataStatistics[GRAPH_ID]= statVars;
+
+    var supercent = 89+'%';
+    var sym = '';
+    if (statVars['opRecommand'] == 1)
+        sym = '<a href="javascript:void(0);" onmouseover="showDetail(' + statVars['opRecommand'] + ',\'' + statVars['opRecommandDtl'] + '\',' + GRAPH_ID + ')"; onmouseout="hideDetail(' + GRAPH_ID + ')"><img src="img/buy.png?r=12243" /></a>';
+    else if (statVars['opRecommand'] == 2)
+        sym = '<a href="javascript:void(0);" onmouseover="showDetail(' + statVars['opRecommand'] + ', \'' + statVars['opRecommandDtl'] + '\',' + GRAPH_ID + ');" onmouseout="hideDetail(' + GRAPH_ID + ')"><img src="img/sell.png?r=12243" /></a>';
+
+    str = str.join("\n");
+
+    var stockNames = getStockNamesFromParam(systemVars);
+    stockNames = stockNames.replace("\";","").replace("\";","");
+    // update parameter
+    var t = $('#graphHolder_' + GRAPH_ID).html();
+    $('#graphHolder_' + GRAPH_ID).html(t.replace('#stocknames#', stockNames).replace('#sym#', sym));
+    var t = $('#g_detail_'+GRAPH_ID).html();
+    $('#g_detail_'+GRAPH_ID).html(t.replace('#stat#', stat));
+    var t = $('#g_label_'+GRAPH_ID).html();
+    $('#g_label_'+GRAPH_ID).html(t.replace('#su#',supercent));
+    //inigraph(str,currentGraphDiv);
+
+    loadedFlattenHistoryResults[GRAPH_ID] = str;
+
+    loadedFlattenHistoryPriceResults[GRAPH_ID] = statVars['priceCache'];
+    //assign statvar to global
+    loadedDataStatistics[GRAPH_ID] = statVars;
+
+    updateGraph(str, GRAPH_ID, hedgeType);
+
+}
+
+function showDetail(opID, msg, GRAPH_ID) {
+    $('#msg_' + GRAPH_ID).html(msg).stop().fadeTo("slow", 0.85);
+    //console.log(obj);
+    //console.log(GRAPH_ID);
+}
+
+function hideDetail(GRAPH_ID) {
+    $('#msg_' + GRAPH_ID).stop().fadeOut("slow");
+}
+
+function updateGraphRealtime(data, GRAPH_ID) {
+    if (isDebug)
+        console.log("group(" + graphData[GRAPH_ID].graphID + ")  \"" + graphData[GRAPH_ID]._code + "\" loading Complete!");
+    graphs[GRAPH_ID].updateOptions({
+        'file': data
+    });
+}
+
+function updateGraph(data, GRAPH_ID, hedgeType) {
+    
+    graphs[GRAPH_ID].updateOptions({
+        'file': data,
+    });
+    if (hedgeType == 1)
+        graphs[GRAPH_ID].setVisibility(3, false);
+    else if (hedgeType == 2)
+        graphs[GRAPH_ID].setVisibility(2, false);
+
+    $('#loader_' + GRAPH_ID).css('display','none');
+}
+
+function getStockNamesFromParam(systemVars) {
+    var str = "";   
+    for (var i = 0; i < systemVars.system.length; i++) {
+        str += "<font class='graphTitle_" + i + "'>" + systemVars['system'][i]['name'] + "</font> | ";
+    }
+    return str.substring(0, str.length - 2);
+}
+
+function objLength(obj) {
+    var result = 0;
+    for (var prop in obj) {
+        if (obj.hasOwnProperty(prop)) {
+            // or Object.prototype.hasOwnProperty.call(obj, prop)
+            result++;
+        }
+    }
+    return result;
+}
+
+//merge stock data into one str
+function preflight(obj, GRAPH_ID) {
+    // get system variables
+    //var systemVars = getSytemVariables(obj);
+    //get target time
+    var targetTime = getDataLength('2y');
+    // final stock str
+    var finalStockStr = new Array();
+    // unify data
+    obj = mkvalidate(obj, GRAPH_ID);
+    // flatten data
+    obj = flattenData(obj, graphData[GRAPH_ID]._code);
+
+    return obj;
+    // 
+}
+
+function getSytemVariables(obj) {
+    var arr = {};
+    for (key in obj)
+        if (key == "system") {
+            arr['system'] = obj[key]
+            delete obj[key];
+            return arr;
+        }
+    return arr;
+}
+
+function getBeginIndex(arr, date) {
+    for (var i = 0; i < arr.length; i++)
+        if (toUnivfiedMMDDYYYY(arr[i][0]) == date)
+            return i;
+    return -1;
+}
+
+function findLastNoneEmptyEntry(masterDate, arr, index) {
+    var md = new Date(masterDate);
+    var target = new Date(arr[index][0]);
+    if (target < md)
+        return index;
+    else
+        return (index - 1);
+}
+
+function flattenData(obj, codesWithOrder) {
+    var finalVar = new Array();
+    var len = obj[Object.keys(obj)[0]].length
+    var objlen = Object.size(obj);
+    var date = "";
+    var sym = "";
+    var val = "";
+    var per = "";
+    var hedge = 0;
+    var minusHedge = 0;
+    var minusHedgeArr = new Array();
+    var hedgeArr = new Array();
+    finalVar[0] = "Date,";
+    //initialize first line for parameters
+    for (var i = 0; i < objlen; i++) {
+        finalVar[0] += codesWithOrder[i] + ",";
+    }
+
+    //clean up
+    //add system variable
+    finalVar[0] += "Hedge,MHedge";
+    var priceCache = Array();
+    var inconsistencyCheck = false;
+    // i start 1 because 0 is configuration
+    for (var i = 1; i < len; i++) {
+            var tmpPriceCache = Array(); 
+        for (var j = 0; j < objlen; j++) {
+            var currentObject = obj[codesWithOrder[j]];
+            if (currentObject == undefined)
+                console.log("undefined!!");
+            if (date == "")
+                date = toUnivfiedMMDDYYYY(currentObject[i][0]) + ",";
+            // check if date is equal
+            if (date != toUnivfiedMMDDYYYY(currentObject[i][0]) + ",") {
+                //console.log("Flatten failed due to date inconsistency!" +  Object.keys(obj)[j]);
+                console.log("Inconsistency Removed");
+                inconsistencyCheck = true;
+                // check if price is zero
+            } else if (currentObject[i][2] == 0) {
+                console.log("Price Found zero at" + toUnivfiedMMDDYYYY(currentObject[i][0]) + " for " + key + ", entry removed");
+                inconsistencyCheck = true;
+            } else {
+                tmpPriceCache[j] = currentObject[i][2];
+                per += currentObject[i][1] + ",";
+                hedge += parseFloat(currentObject[i][1]);
+                minusHedge = calMinusHedge(minusHedge, parseFloat(currentObject[i][1]));
+            }
+        }
+        // merging
+        if (!inconsistencyCheck) {
+            finalVar[i] = date + per + hedge.toFixed(2) + "," + minusHedge.toFixed(2);
+            hedgeArr[i] = hedge;
+            minusHedgeArr[i] = minusHedge;
+            if(tmpPriceCache.length>1)
+             priceCache.push(tmpPriceCache);
+        }
+
+        //reset inconsistency check
+        inconsistencyCheck = false;
+        //finalVar[i] = finalVar[i].substring(0, finalVar[i].length-1);
+        //reset
+        date = "";
+        per = "";
+        hedge = 0;
+        minusHedge = 0;
+    }
+
+    //calculate math
+    var ave = getAverage(hedgeArr).toFixed(2);
+    var sd = getStandardDeviation(hedgeArr).toFixed(2);
+    var upperLimit = parseFloat(ave) + parseFloat(sd);
+    var lowerLimit = ave - sd;
+    var diff = 2 * sd;
+    var stat = "平均: " + ave + ", 标准差:" + sd + "<br>上限:" + upperLimit.toFixed(2) + ", 下限:" + lowerLimit.toFixed(2);
+
+    //continue here
+    var m_ave = getAverage(minusHedgeArr).toFixed(2);
+    var m_sd = getStandardDeviation(minusHedgeArr).toFixed(2);
+    var m_upperLimit = parseFloat(m_ave) + parseFloat(m_sd);
+    var m_lowerLimit = m_ave - m_sd;
+    var m_diff = 2 * m_sd;
+
+    // statistic variables
+    var statVars = {};
+    // input keys
+    statVars['keys'] = new Array();
+
+
+    var hdata = Array();
+    var mhdata = Array();
+    for(var i = 1; i < hedgeArr.length; i ++){
+        if(hedgeArr[i] != undefined){
+        hdata.push([i,parseFloat(hedgeArr[i])]);
+        mhdata.push([i,parseFloat(minusHedgeArr[i])]);
+        }
+    }
+
+    statVars['linear_regression_hedge'] = regression('linear', hdata);
+
+    statVars['linear_regression_mhedge'] = regression('linear', mhdata);
+
+    for ($i = 0; $i < objlen; $i++)
+        statVars['keys'][$i] = Object.keys(obj)[$i];
+    // check hedge of mhedge
+    if (Math.abs(m_diff) < Math.abs(diff)) {
+        //display minus hedge
+        statVars['stat'] = "平均: " + m_ave + ", 标准差:" + m_sd + "<br>上限:" + m_upperLimit.toFixed(2) + ", 下限:" + m_lowerLimit.toFixed(2) +"<br>斜率: "+statVars['linear_regression_mhedge']['equation'][0].toFixed(2);
+        statVars['hedgeType'] = 2;
+        statVars['hedgeTypeStr'] = 'Substraction';
+        statVars['ave'] = m_ave;
+        statVars['sd'] = m_sd;
+        statVars['upperLimit'] = m_upperLimit;
+        statVars['lowerLimit'] = m_lowerLimit;
+        statVars['latestHedgeIndex'] = minusHedgeArr[minusHedgeArr.length - 1].toFixed(2);
+    } else if(Math.abs(m_diff) > Math.abs(diff)) {
+        //
+        statVars['stat'] = "平均: " + ave + ", 标准差:" + sd + "<br>上限:" + upperLimit.toFixed(2) + ", 下限:" + lowerLimit.toFixed(2)+"<br>斜率: "+statVars['linear_regression_hedge']['equation'][0].toFixed(2);
+        statVars['hedgeType'] = 1;
+        statVars['hedgeTypeStr'] = 'Addition';
+        statVars['ave'] = ave;
+        statVars['sd'] = sd;
+        statVars['upperLimit'] = upperLimit;
+        statVars['lowerLimit'] = lowerLimit;
+        statVars['latestHedgeIndex'] = hedgeArr[hedgeArr.length - 1].toFixed(2);
+    } else {
+        // when plus hedge equals minus hedge
+        if(objlen == 1){
+            //only one item
+             statVars['stat'] = "平均: " + ave + ", 标准差:" + sd + "<br>上限:" + upperLimit.toFixed(2) + ", 下限:" + lowerLimit.toFixed(2);
+        statVars['hedgeType'] =0;
+        statVars['ave'] = ave;
+        statVars['sd'] = sd;
+        statVars['upperLimit'] = upperLimit;
+        statVars['lowerLimit'] = lowerLimit;
+        statVars['latestHedgeIndex'] = hedgeArr[hedgeArr.length - 1].toFixed(2);
+        }
+        
+    }
+ 
+   // var hdata = [[1,1],[5,5]];
+
+
+    statVars['hedgeArr'] = hedgeArr;
+
+    statVars['minusHedgeArr'] = minusHedgeArr;
+    //suggestion part
+    statVars['priceCache'] = priceCache;
+    // suggest buy, hold, or sell
+    statVars['opRecommand'] = getopRecommand(statVars);
+
+    // Buy which one, sell which one, expected APR, Holding time
+    statVars['opRecommandDtl'] = getopdetails(statVars);
+    // insert locally
+    finalVar.push(statVars);
+
+    return finalVar;
+}
+
+
+function getopdetails(obj) {
+    var str = '';
+    switch (obj['opRecommand']) {
+        // hit lower limit
+        case 1:
+            // opposit etf plus together
+            if (obj['hedgeType'] == 1)
+                str = "买: " + obj.keys[0] + " 和 " + obj.keys[1] +
+                "<br>平仓位: " + obj['upperLimit'].toFixed(2);
+            // same side stocks/etfs/futures
+            else if (obj['hedgeType'] == 2)
+            //check hedge positive or negative
+                if (obj['latestHedgeIndex'] > 0)
+                    str = "买: " + obj.keys[0] + ", 卖出: " + obj.keys[1] +
+                    "<br>平仓位: " + obj['upperLimit'].toFixed(2);
+                // if hedge is below zero, first element smaller than second
+                else
+                    str = "买: " + obj.keys[0] + ", 卖出: " + obj.keys[1] +
+                    "<br>平仓位: " + obj['upperLimit'].toFixed(2);
+
+            break;
+            // hit upper limit
+        case 2:
+            // opposit etf plus together
+            if (obj['hedgeType'] == 1)
+                str = "卖出: " + obj.keys[0] + " 买 " + obj.keys[1] +
+                "平仓位: " + obj['lowerLimit'];
+            // same side stocks/etfs/futures
+            else if (obj['hedgeType'] == 2)
+            //check hedge positive or negative
+                if (obj['latestHedgeIndex'] > 0)
+                    str = "卖出: " + obj.keys[0] + ", 买: " + obj.keys[1] +
+                    "平仓位: " + obj['lowerLimit'];
+                // if hedge is below zero, first element smaller than second
+                else
+                    str = "卖出: " + obj.keys[0] + ", 买: " + obj.keys[1] +
+                    "平仓位: " + obj['lowerLimit'];
+
+            break;
+
+        case 0:
+            break;
+
+        default:
+            break;
+
+    }
+    return str;
+}
+
+/*
+function check whether latest price is
+with in purchase range
+*/
+function getopRecommand(obj) {
+    // upper is 10% up the lower limit
+    var buyUpper = obj['lowerLimit'] * 1.08;
+    // lower is 10% lower the lower limit
+    var buyLower = obj['lowerLimit'] * 0.95;
+
+    //check case
+    if (Math.abs(obj['latestHedgeIndex']) > Math.abs(buyLower)  &&
+        Math.abs(obj['latestHedgeIndex']) < Math.abs(buyUpper) ||
+        (obj['latestHedgeIndex'] < buyLower))
+    // 1 for buy recommended condition
+        return 1;
+    // similar
+    var sellUpper = obj['upperLimit'] * 1.1;
+    var sellLower = obj['upperLimit'] * 0.9;
+
+    if (Math.abs(obj['latestHedgeIndex']) > Math.abs(sellLower) &&
+        Math.abs(obj['latestHedgeIndex']) < Math.abs(sellUpper) ||
+        obj['latestHedgeIndex'] > sellUpper)
+    // 2 for sell recommended condition
+        return 2;
+    // general condition, nothing recommended
+    return 0;
+}
+
+function removeElement(obj, i) {
+    for (key in obj)
+        obj[key].splice(i, 1);
+}
+
+function calStatistics(arr) {
+    return getStandardDeviation(arr);
+}
+
+function mkvalidate(obj, GRAPH_ID) {
+    // get longest first,
+
+    var masterLen = 0;
+    var masterkey = "";
+
+    //unifying the begining date
+    //geting first day in master
+
+    //get latest first day
+    var firstDay = new Date(obj[Object.keys(obj)[0]][0][0]);
+    for (key in obj) {
+        if (new Date(obj[key][0][0]) > firstDay)
+            firstDay = toUnivfiedMMDDYYYY(obj[key][0][0]);
+    }
+
+    // unify firstday
+    firstDay = toUnivfiedMMDDYYYY(firstDay);
+    for (key in obj) {
+        var index = getBeginIndex(obj[key], firstDay);
+        if (index != -1) {
+            // slice the array
+            obj[key] = obj[key].slice(index, obj[key].length);
+            // recalculate values
+            obj[key] = recalculatePercent(obj[key]);
+
+            graphData[GRAPH_ID].purchasePrice[key] = parseFloat(obj[key][0][2]);
+
+            graphData[GRAPH_ID].purchaseDate[key] = toUnivfiedMMDDYYYY(obj[key][0][0]);
+        } else {
+            //nothing found switch firstday  
+            console.log("Failed to unify the begining! " + key);
+        }
+    }
+
+
+    //setup masterlen and masterkey
+    masterkey = Object.keys(obj)[0]
+    masterLen = obj[masterkey].length;
+
+    //fill in the shorter ones
+    for (key in obj) {
+        // do not process self
+        if (key != masterkey) {
+            //make sure first element is same
+            if (toUnivfiedMMDDYYYY(obj[key][0][0]) !=
+                toUnivfiedMMDDYYYY(obj[masterkey][0][0]))
+            // first key is not equal
+            {
+                console.log("Vlidate Failed due to first date not equal" + key);
+            }
+
+            // begining process
+            var cindex = 0;
+            var masterDate = "";
+            var currentDate = "";
+            var lastEffectiveIndex = 0;
+            for (var i = 0; i < masterLen; i++) {
+                if(i == 210)
+                    console.log(210);
+                masterDate = toUnivfiedMMDDYYYY(obj[masterkey][i][0]);
+                if(obj[key][cindex] != undefined){
+                currentDate = toUnivfiedMMDDYYYY(obj[key][cindex][0]);
+                lastEffectiveIndex = cindex;
+                } else{
+                // out of range , start to insert blank data
+                currentDate = toUnivfiedMMDDYYYY(obj[key][lastEffectiveIndex][0]);
+
+                }
+                if (currentDate != masterDate) {
+                    //check for removal
+                    if (new Date(currentDate) < new Date(masterDate)) {
+                        // array remove that date
+                        obj[key].splice(cindex, 1);
+                        //update on that date to current with no
+                    } else {
+                        var selectIndex = findLastNoneEmptyEntry(masterDate, obj[key], cindex);
+                        //insert into the key
+                        obj[key].splice(selectIndex + 1, 0, [masterDate, obj[key][selectIndex][1], obj[key][selectIndex][2]]);
+                        obj[key].join();
+                    }
+                }
+                // continue here tomorrow, check array and test with google                     
+                cindex++;
+            }
+            // clean up the tail
+            if (obj[key].length > masterLen) {
+                var diff = (obj[key].length - masterLen);
+                obj[key].removeLastN(diff);
+
+            } else if(obj[key].length < masterLen){
+                // data ended earlier than master
+                var diff = (masterLen-obj[key].length);
+                for(var i =0 ; i < diff; i ++)
+                    obj[key].push([obj[masterkey][masterLen-1][0],obj[key][obj[key].length-1][1],obj[key][obj[key].length-1][2]])
+            }
+
+            if (obj[key].length != masterLen) {
+                console.log("Validate Failed!! Invalid length for " + key + " with length: " + obj[key].length);
+                return false;
+            }
+
+        }
+    }
+
+    return obj;
+
+}
+
+
+function recalculatePercent(obj) {
+    var purchasePrice = parseFloat(obj[0][2]);
+    for (var i = 0; i < obj.length; i++) {
+        obj[i][1] = ((obj[i][2] - purchasePrice) / purchasePrice * 100).toFixed(2);
+    }
+    return obj;
+}
+
+function toChineseYYYYMMDD(date) {
+    var date = new Date(date);
+    var yyyy = date.getFullYear().toString();
+    var mm = (date.getMonth() + 1).toString(); // getMonth() is zero-based
+    var dd = date.getDate().toString();
+    return yyyy + "-" + (mm[1] ? mm : "0" + mm[0]) + "-" + (dd[1] ? dd : "0" + dd[0]); // padding
+}
+
+function getFullYMDH() {
+    var date = new Date();
+    var t = (date.getMonth() + 1) + '/' + date.getDate() + '/' + date.getFullYear() + ' ' +
+        date.getHours() + ':' + date.getMinutes();
+    return t;
+}
+
+function getCNFullYMDH(){
+    var offset = +16;
+    var d = new Date();
+    var utc = d.getTime() - (d.getTimezoneOffset() * 60000);
+    var nd = new Date(utc + (3600000 * offset));
+    var t = (nd.getMonth() + 1) + "/" + nd.getDate() + "/" + nd.getFullYear()+" "+
+    nd.getHours() + ":"+nd.getMinutes();
+    return t;   
+}
+
+function toUnivfiedMMDDYYYY(date) {
+    var date = new Date(date);
+    var t = (date.getMonth() + 1) + '/' + date.getDate() + '/' + date.getFullYear();
+    return t;
+}
+
+
+function getDayInChina() {
+    return calcTime('beijing', '+8');
+}
+
+function getDHMInChina() {
+    var d = new Date();
+    var utc = d.getTime() - (d.getTimezoneOffset() * 60000);
+    var nd = new Date(utc + (3600000 * 16));
+    return ((nd.getMonth() + 1) + "/" + nd.getDate() + "/" + nd.getFullYear() + " " + nd.getHours() + ":" + nd.getMinutes());
+}
+
+function calcTime(city, offset) {
+    var d = new Date();
+    var utc = d.getTime() - (d.getTimezoneOffset() * 60000);
+    var nd = new Date(utc + (3600000 * offset));
+    return ((nd.getMonth() + 1) + "/" + nd.getDate() + "/" + nd.getFullYear());
+}
+
+function getDayOneYearAgo() {
+    var offset = +16;
+    var d = new Date();
+    var utc = d.getTime() - (d.getTimezoneOffset() * 60000);
+    var nd = new Date(utc + (3600000 * offset));
+    nd.setFullYear(nd.getFullYear() - 1);
+    return ((nd.getMonth() + 1) + "/" + nd.getDate() + "/" + nd.getFullYear());
+}    
+
+function getDataLength(dataLen) {
+    var offset = +16;
+    var d = new Date();
+    var utc = d.getTime() - (d.getTimezoneOffset() * 60000);
+    var nd = new Date(utc + (3600000 * offset));
+    switch(dataLen){
+        case 'y':
+        nd.setFullYear(nd.getFullYear() - 1);
+        break;
+
+        case 'hy':
+        nd.setMonth(nd.getMonth() - 6);
+        break;
+
+        case '2y':
+        nd.setFullYear(nd.getFullYear()-2);
+
+        default:
+        nd.setFullYear(nd.getFullYear() - 1);
+        break;
+
+    }
+    
+    return ((nd.getMonth() + 1) + "/" + nd.getDate() + "/" + nd.getFullYear());
+}    
+
+
+        </script>
+        <!-- content -->
+        
+
+        </body>
+</html>
+
+
+<!-- references
+    // m, q, hy, y,try,fiy,sy,se
+   
+    m -> month
+    q -> 3 month
+    hy -> 6 month
+    y -> 1 year
+    try -> 3 year
+    fiy -> 5 year
+    sy -> year to date
+    se -> max
+
+    获得期货排名
+    http://webftcn.hermes.hexun.com/shf/sortlist?block=741&number=100&title=5&commodityid=0&direction=0&start=0&column=code,name,price,updown,volume,open,vibrationRatio&callback=hx_json81462035658518
+        !-->
